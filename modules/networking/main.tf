@@ -7,29 +7,18 @@ terraform {
   }
 }
 
-# VPC (commented out to prevent conflicts with existing VPCs)
-# resource "digitalocean_vpc" "this" {
-#   name        = var.vpc_name
-#   region      = var.region
-#   ip_range    = var.ip_range
-#   description = var.description
-# }
-
-# Use data source to reference existing VPC instead
 data "digitalocean_vpc" "existing" {
   name = var.vpc_name
 }
 
-# Domain
 resource "digitalocean_domain" "this" {
   count = var.create_domain ? 1 : 0
   name  = var.domain_name
 }
 
-# Domain Records
 resource "digitalocean_record" "a" {
   for_each = var.create_domain ? var.a_records : {}
-  
+
   domain = digitalocean_domain.this[0].name
   type   = "A"
   name   = each.key
@@ -39,7 +28,7 @@ resource "digitalocean_record" "a" {
 
 resource "digitalocean_record" "cname" {
   for_each = var.create_domain ? var.cname_records : {}
-  
+
   domain = digitalocean_domain.this[0].name
   type   = "CNAME"
   name   = each.key
@@ -49,7 +38,7 @@ resource "digitalocean_record" "cname" {
 
 resource "digitalocean_record" "mx" {
   for_each = var.create_domain ? var.mx_records : {}
-  
+
   domain   = digitalocean_domain.this[0].name
   type     = "MX"
   name     = each.key
@@ -58,16 +47,15 @@ resource "digitalocean_record" "mx" {
   ttl      = lookup(each.value, "ttl", 3600)
 }
 
-# Firewall
 resource "digitalocean_firewall" "this" {
   count = var.create_firewall ? 1 : 0
-  
+
   name        = var.firewall_name
   droplet_ids = var.droplet_ids
-  
+
   dynamic "inbound_rule" {
     for_each = var.inbound_rules
-    
+
     content {
       protocol         = inbound_rule.value.protocol
       port_range       = lookup(inbound_rule.value, "port_range", null)
@@ -75,10 +63,10 @@ resource "digitalocean_firewall" "this" {
       source_tags      = lookup(inbound_rule.value, "source_tags", null)
     }
   }
-  
+
   dynamic "outbound_rule" {
     for_each = var.outbound_rules
-    
+
     content {
       protocol              = outbound_rule.value.protocol
       port_range            = lookup(outbound_rule.value, "port_range", null)
