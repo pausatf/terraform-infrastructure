@@ -5,3 +5,20 @@ digitalocean_token = "your_api_token_here"
 # region = "sfo3"
 # ssh_key_name = "your_ssh_key_name"
 # project_name = "Your Project"
+
+# Cloudflare API token (required for Cloudflare resources)
+# To create a proper API token with all necessary permissions:
+# 1. Go to https://dash.cloudflare.com/profile/api-tokens
+# 2. Click "Create Token"
+# 3. Select "Create Custom Token"
+# 4. Set a name like "Terraform Management"
+# 5. Add the following permissions:
+#    - Zone > Zone Settings > Edit
+#    - Zone > Zone > Edit
+#    - Zone > DNS > Edit
+#    - Zone > Page Rules > Edit
+#    - Zone > Firewall Services > Edit
+# 6. Set Zone Resources to "Include > Specific zone > pausatf.org"
+# 7. Create the token and paste it below
+cloudflare_api_token = "your_cloudflare_api_token_here"
+cloudflare_account_name = "your_cloudflare_account_name_here"
