@@ -14,7 +14,7 @@ variable "engine" {
   }
 }
 
-variable "version" {
+variable "engine_version" {
   description = "Engine version"
   type        = string
 }
@@ -62,7 +62,7 @@ variable "maintenance_window" {
   default = null
   
   validation {
-    condition = var.maintenance_window == null || (
+    condition = var.maintenance_window == null ? true : (
       contains(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"], lower(var.maintenance_window.day)) &&
       can(regex("^([0-1][0-9]|2[0-3]):[0-5][0-9]$", var.maintenance_window.hour))
     )

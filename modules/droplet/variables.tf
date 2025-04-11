@@ -54,3 +54,9 @@ variable "prevent_destroy" {
   type        = bool
   default     = false
 }
+
+variable "user_data" {
+  description = "User data to be executed on droplet creation"
+  type        = string
+  default     = null
+}

@@ -3,8 +3,3 @@ variable "zone_name" {
   type        = string
 }
 
-variable "zone_settings" {
-  description = "Zone settings override"
-  type        = map(any)
-  default     = {}
-}

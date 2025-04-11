@@ -1,411 +1,241 @@
-# Digital Ocean and Cloudflare Terraform Configuration
+# PAUSATF WordPress Multi-Environment Terraform Infrastructure
 
-This repository contains Terraform configuration for managing Digital Ocean  
-infrastructure and Cloudflare resources using a modular approach with best practices.
+This repository contains Terraform configurations for deploying a multi-environment WordPress infrastructure on DigitalOcean with OpenLiteSpeed, managed MySQL database, Cloudflare integration, Google Workspace management, and SendGrid email services.
 
-## Structure
+## Architecture
 
-The configuration is organized into modules for better reusability and maintainability:
+The infrastructure consists of:
 
-```hcl
-do-terraform/
-├── modules/
-│   ├── database/       # Database cluster management
-│   ├── droplet/        # Droplet (VM) management
-│   ├── networking/     # VPC, Domain, and Firewall management
-│   ├── project/        # Project management
-│   └── cloudflare/     # Cloudflare resource management
-│       ├── dns/        # DNS record management
-│       ├── zone/       # Zone management
-│       ├── firewall/   # Firewall rule management
-│       ├── page_rule/  # Page rule management
-│       └── worker/     # Worker script and route management
-├── main.tf             # Provider configuration and VPC/Project modules
-├── droplets.tf         # Droplet and Firewall resources
-├── networking.tf       # Domain resources
-├── databases.tf        # Database resources (commented out)
-├── projects.tf         # Project resource associations
-├── cloudflare.tf       # Cloudflare resource configuration
-├── variables.tf        # Variable definitions
-└── terraform.tfvars    # Variable values
+- **Single DigitalOcean Droplet** running OpenLiteSpeed WordPress
+- **Three WordPress Environments** (dev, stage, prod) using virtual hosts
+- **Managed MySQL Database** with separate databases for each environment
+- **Cloudflare Integration** for DNS, SSL, and security
+- **Google Workspace Management** for email and user management
+- **SendGrid Integration** for transactional emails
+- **Postfix Configuration** for reliable email delivery via Gmail SMTP
+- **Volume Storage** for WordPress data
+- **SSH Key Setup** for secure server-to-server communication
+
+## Directory Structure
+
+```
+.
+├── main.tf                      # Main Terraform configuration
+├── variables.tf                 # Input variables
+├── outputs.tf                   # Output values
+├── versions.tf                  # Version constraints
+├── wordpress.tf                 # WordPress infrastructure
+├── cloudflare.tf                # Cloudflare configuration
+├── google_workspace.tf          # Google Workspace configuration
+├── sendgrid.tf                  # SendGrid configuration
+├── projects.tf                  # Project organization
+├── wordpress-multi-env-user-data.sh  # Droplet initialization script
+├── wordpress-multi-env-migration.sh  # Migration script
+├── wordpress-env-sync.sh        # Environment sync script
+├── modules/                     # Reusable modules
+│   ├── database/                # Database module
+│   ├── droplet/                 # Droplet module
+│   └── networking/              # Networking module
+└── scripts/                     # Utility scripts
 ```
 
-## Modules
+## Prerequisites
 
-### Droplet Module
+- Terraform v1.0.0 or newer
+- DigitalOcean API token with write access
+- Cloudflare API token with Zone and DNS permissions
+- Google Workspace admin account (optional)
+- SendGrid API key (optional)
+- SSH key uploaded to DigitalOcean
+- Domain name configured in Cloudflare
 
-Manages Digital Ocean Droplets (VMs) with consistent configuration:
+## Getting Started
 
-- Consistent naming convention
-- Tagging for organization and filtering
-- Lifecycle management to prevent accidental destruction
-- SSH key management
+1. Clone this repository:
 
-### Networking Module
+```bash
+git clone https://github.com/pausatf/do-terraform.git
+cd do-terraform
+```
 
-Manages VPCs, Domains, and Firewalls:
+2. Create a `terraform.tfvars` file with your credentials:
 
-- VPC configuration with proper IP ranges
-- Domain management with DNS records
-- Firewall rules for securing resources
+```hcl
+# API Tokens
+digitalocean_token   = "your_digitalocean_api_token"
+cloudflare_api_token = "your_cloudflare_api_token"
+cloudflare_zone_id   = "your_cloudflare_zone_id"
 
-### Database Module
+# Infrastructure Configuration
+domain_name          = "pausatf.com"
+ssh_key_name         = "your_ssh_key_name"
 
-Manages Database Clusters with:
+# Email Configuration
+smtp_user            = "your_gmail_address@gmail.com"
+smtp_password        = "your_gmail_app_password"
 
-- Engine configuration
-- Private networking
-- User and database management
-- Connection pools
-- Firewall rules
+# Google Workspace (optional)
+google_workspace_admin_email = "admin@pausatf.com"
+google_workspace_customer_id = "your_customer_id"
 
-### Project Module
-
-Manages Projects and resource organization:
-
-- Project metadata
-- Resource associations
-
-### Cloudflare Modules
-
-The Cloudflare modules provide a structured way to manage Cloudflare resources:
-
-#### DNS Module
-
-Manages DNS records for Cloudflare zones:
-
-- A, AAAA, CNAME, TXT, MX, and other record types
-- Proxied and non-proxied records
-- TTL configuration
-- **Integration with Digital Ocean**: DNS records can reference Digital Ocean droplet IPs directly
-
-#### Zone Module
-
-Creates and configures Cloudflare zones:
-
-- Zone creation and settings
-- SSL configuration
-- Security settings
-
-#### Firewall Module
-
-Creates firewall rules for Cloudflare zones using the modern ruleset API:
-
-- Rule expressions using Cloudflare's filter syntax
-- Actions (block, challenge, js_challenge, allow)
-- Priority management
-- **Integration with Digital Ocean**: Firewall rules can complement Digital Ocean firewall settings
-- Uses the new `cloudflare_ruleset` resource (replacing deprecated filter/firewall_rule resources)
-
-#### Page Rule Module
-
-Creates page rules for Cloudflare zones:
-
-- URL pattern matching
-- Cache settings
-- Security settings
-- Forwarding rules
-
-#### Worker Module
-
-Creates worker scripts and routes:
-
-- JavaScript worker code management
-- Route pattern configuration
-- Environment variables and bindings
-
-### Syncing Digital Ocean and Cloudflare
-
-To ensure that your Digital Ocean infrastructure and Cloudflare configuration remain in sync:
-
-1. **Reference Digital Ocean Resources**: In your Cloudflare configuration, reference
-   Digital Ocean resources directly:
-
-   ```hcl
-   # DNS record pointing to a Digital Ocean droplet
-   {
-     name    = "www"
-     type    = "A"
-     value   = module.droplet_web.ipv4_address  # Will be used as 'content' in the module
-     ttl     = 3600
-     proxied = true
-   }
-   ```
-
-2. **Complementary Firewall Rules**: Ensure that your Cloudflare firewall rules
-   complement your Digital Ocean firewall settings:
-   - Digital Ocean firewalls control traffic to your servers
-   - Cloudflare firewalls control traffic to your websites before it reaches your servers
-
-3. **Use the Sync Script**: Run the provided sync_state.sh script to verify that your
-   configurations are in sync:
-
-   ```bash
-   ./sync_state.sh
-   ```
-
-   This script will:
-   - Check if DNS records reference the correct droplet IPs
-   - Verify that firewall rules are consistent between Digital Ocean and Cloudflare
-   - Identify any drift between your Terraform state and the actual infrastructure
-
-## Best Practices Implemented
-
-### Organization and Structure
-
-- **Modular Design**: Resources are organized into reusable modules
-- **Consistent Naming**: Resources follow a consistent naming convention
-- **Tagging Strategy**: Resources are tagged for better organization and filtering
-
-### Resource Management
-
-- **Project Resources**: Resources are properly associated with projects
-- **Resource Lifecycle Management**: Critical resources have `prevent_destroy`  
-  set to prevent accidental deletion
-- **Firewall Rules**: Network access is restricted with firewall rules
-
-## Usage
-
-### Prerequisites
-
-- Terraform v1.0.0+
-- Digital Ocean API token with write access
-
-### Getting Started
-
-1. Clone this repository
-2. Set your Digital Ocean API token in `terraform.tfvars` or as an environment variable:
-
-   ```bash
-   export TF_VAR_digitalocean_token="your_token"
-   ```
+# SendGrid (optional)
+sendgrid_api_key     = "your_sendgrid_api_key"
+```
 
 3. Initialize Terraform:
 
-   ```bash
-   terraform init
-   ```
-
-4. Plan your changes:
-
-   ```bash
-   terraform plan
-   ```
-
-5. Apply changes:
-
-   ```bash
-   terraform apply
-   ```
-
-## Adding New Resources
-
-### Adding a New Droplet
-
-```hcl
-module "droplet_new" {
-  source = "./modules/droplet"
-  
-  name     = "new-droplet"
-  size     = "s-1vcpu-1gb"
-  image    = "ubuntu-20-04-x64"
-  region   = "sfo2"
-  vpc_uuid = module.vpc_sfo2.vpc_id
-  
-  tags = ["production", "web", "app-name"]
-  
-  prevent_destroy = true
-}
+```bash
+terraform init
 ```
 
-### Adding a New Database
-
-```hcl
-module "new_db" {
-  source = "./modules/database"
-  
-  name       = "new-db"
-  engine     = "mysql"
-  version    = "8"
-  size       = "db-s-1vcpu-1gb"
-  region     = "sfo2"
-  node_count = 1
-  
-  private_network_uuid = module.vpc_sfo2.vpc_id
-  
-  tags = ["mysql", "production", "app-name"]
-  
-  prevent_destroy = true
-}
-```
-
-### Adding a New Domain
-
-```hcl
-module "domain_new" {
-  source = "./modules/networking"
-  
-  # VPC settings (not used for domain)
-  vpc_name    = "unused"
-  region      = "sfo2"
-  ip_range    = "10.0.0.0/24"
-  
-  # Domain settings
-  create_domain = true
-  domain_name   = "example.com"
-  
-  # Domain records
-  a_records = {
-    "@" = {
-      value = "192.0.2.1"
-      ttl   = 3600
-    }
-  }
-  
-  # No firewall
-  create_firewall = false
-}
-```
-
-### Adding Cloudflare Resources
-
-#### Adding a Cloudflare Zone
-
-```hcl
-module "zone_example_com" {
-  source = "./modules/cloudflare/zone"
-  
-  account_id = local.cloudflare_account_id
-  zone_name  = "example.com"
-  settings   = {
-    plan = "free"
-    type = "full"
-  }
-  zone_settings = {
-    always_use_https = true
-    ssl              = "strict"
-  }
-}
-```
-
-#### Adding DNS Records
-
-```hcl
-module "dns_example_com" {
-  source = "./modules/cloudflare/dns"
-  
-  zone_id = module.zone_example_com.zone_id
-  records = [
-    {
-      name    = "@"
-      type    = "A"
-      value   = module.droplet_web.ipv4_address  # Used as 'content' in the module
-      ttl     = 3600
-      proxied = true
-    },
-    {
-      name    = "www"
-      type    = "CNAME"
-      value   = "example.com"  # Will be used as 'content' in the module
-      proxied = true
-    }
-  ]
-}
-```
-
-#### Adding Firewall Rules
-
-```hcl
-module "firewall_example_com" {
-  source = "./modules/cloudflare/firewall"
-  
-  zone_id = module.zone_example_com.zone_id
-  rules   = [
-    {
-      description = "Block country X"
-      expression  = "(ip.geoip.country eq \"X\")"
-      action      = "block"
-      priority    = 1
-    }
-  ]
-}
-```
-
-## Maintenance
-
-### Syncing with Digital Ocean
-
-To ensure your Terraform state is in sync with Digital Ocean:
+4. Plan the deployment:
 
 ```bash
-terraform refresh
 terraform plan
 ```
 
-### Transitioning to Modular Structure
-
-To transition from the old structure to the new modular structure without  
-destroying and recreating resources, use the provided migration script:
+5. Apply the configuration:
 
 ```bash
-./migrate_to_modules.sh
+terraform apply
 ```
 
-This script will:
+## Environment Management
 
-1. Remove the resources from the current Terraform state
-2. Import them into the new module structure
-3. Preserve the actual resources in Digital Ocean
+### Accessing Environments
 
-This approach ensures that your infrastructure is not destroyed and recreated
-during the transition to the modular structure.
+- **Development**: https://dev.pausatf.com
+- **Staging**: https://stage.pausatf.com
+- **Production**: https://www.pausatf.com
 
-After running the migration script, run `terraform plan` to see if there are any
-remaining differences. You may still see some attribute changes, but the
-resources themselves should not be destroyed and recreated.
+### Syncing Between Environments
 
-### Importing New Resources
-
-For importing new resources that aren't yet managed by Terraform, use the  
-`import_resources.sh` script.
-
-### Syncing with Cloudflare
-
-To ensure your Terraform state is in sync with Cloudflare:
+Use the provided sync script to copy content between environments:
 
 ```bash
-./sync_state.sh
+./wordpress-env-sync.sh --source dev --destination stage --target-ip <droplet_ip> --content all
 ```
 
-### Importing Existing Cloudflare Resources
+## Migration
 
-If you already have resources in Cloudflare that you want to manage with Terraform,
-you can import them into your Terraform state:
+To migrate from an existing WordPress site:
 
 ```bash
-./import_cloudflare_resources.sh
+./wordpress-multi-env-migration.sh --source-host old.pausatf.org --source-user admin \
+  --source-path /var/www/html --target-ip <droplet_ip> --environment prod
 ```
 
-This script will:
+The migration script uses SSH keys for secure server-to-server communication. The public key will be displayed during the droplet initialization, which you should add to the authorized_keys file on the old server.
 
-1. Identify existing Cloudflare resources (zones, DNS records, page rules, etc.)
-2. Import them into your Terraform state
-3. Ensure that Terraform doesn't try to create resources that already exist
+## Email Configuration
 
-### Generating Terraform from Existing Cloudflare Infrastructure
+### Gmail SMTP Integration
 
-To generate Terraform configuration from your existing Cloudflare infrastructure:
+The infrastructure is configured to use Gmail SMTP for reliable email delivery. Postfix is automatically configured during the droplet initialization to use Gmail's SMTP server.
+
+To set up Gmail SMTP:
+
+1. Create an App Password in your Google Account
+2. Add the Gmail address and App Password to your terraform.tfvars file:
+
+```hcl
+smtp_user     = "your_gmail_address@gmail.com"
+smtp_password = "your_gmail_app_password"
+```
+
+### SendGrid Integration
+
+For transactional emails, the infrastructure can be configured to use SendGrid:
+
+```hcl
+sendgrid_api_key      = "your_sendgrid_api_key"
+sendgrid_from_email   = "noreply@pausatf.com"
+sendgrid_from_name    = "PAUSATF WordPress"
+```
+
+This will set up SendGrid templates for welcome emails, password resets, and notifications.
+
+## Google Workspace Management
+
+The infrastructure can manage Google Workspace resources, including:
+
+- Domain verification
+- Email groups and aliases
+- SMTP relay settings
+
+To enable Google Workspace management:
+
+1. Create a service account in Google Cloud Console
+2. Grant the service account domain-wide delegation
+3. Download the service account credentials JSON file
+4. Add the following to your terraform.tfvars file:
+
+```hcl
+google_workspace_admin_email     = "admin@pausatf.com"
+google_workspace_customer_id     = "your_customer_id"
+google_workspace_credentials_file = "/path/to/credentials.json"
+```
+
+## Cloudflare Integration
+
+The infrastructure uses Cloudflare for:
+
+- DNS management with automatic record creation
+- SSL/TLS encryption with Full (strict) mode
+- Web Application Firewall (WAF) with WordPress-specific rules
+- Page rules for WordPress optimization
+- Performance optimization with Brotli compression and minification
+
+## Maintenance
+
+### Database Backups
+
+The managed MySQL database has automatic backups enabled. You can also create manual backups:
 
 ```bash
-export CLOUDFLARE_API_TOKEN="your_token"
-./generate_terraform.sh
+ssh root@<droplet_ip> "cd /var/www/prod && wp db export backup.sql --allow-root"
 ```
 
-This script will:
+### WordPress Updates
 
-1. Query your Cloudflare account for all resources (zones, DNS records, etc.)
-2. Generate Terraform configuration files in the `terraform_output` directory
-3. Create worker script files for any Cloudflare Workers you have
+Update WordPress core, plugins, and themes:
 
-You can then review the generated files and use them as a starting point for
-your Terraform configuration.
+```bash
+ssh root@<droplet_ip> "cd /var/www/prod && wp core update --allow-root && wp plugin update --all --allow-root && wp theme update --all --allow-root"
+```
+
+## Security Considerations
+
+- The infrastructure uses Cloudflare as a security layer
+- SSH access is restricted to your SSH key
+- Database access is restricted to the WordPress droplet
+- WordPress admin areas have cache bypass rules
+- SMTP authentication is secured with TLS
+- SSH keys are used for server-to-server communication
+
+## Troubleshooting
+
+### Common Issues
+
+- **Database Connection Errors**: Check the database firewall rules
+- **SSL Certificate Issues**: Ensure Cloudflare SSL mode is set correctly
+- **Email Delivery Problems**: Verify SMTP configuration or check SendGrid API key
+- **Google Workspace Integration Issues**: Verify service account permissions
+
+### Logs
+
+Access logs on the droplet:
+
+- OpenLiteSpeed logs: `/usr/local/lsws/logs/`
+- WordPress debug log: `/var/www/[env]/wp-content/debug.log`
+- Mail logs: `/var/log/mail.log`
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

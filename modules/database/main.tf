@@ -1,4 +1,7 @@
 terraform {
+  # Terraform version constraint
+  required_version = ">= 1.0.0"
+
   required_providers {
     digitalocean = {
       source  = "digitalocean/digitalocean"
@@ -10,7 +13,7 @@ terraform {
 resource "digitalocean_database_cluster" "this" {
   name       = var.name
   engine     = var.engine
-  version    = var.version
+  version    = var.engine_version
   size       = var.size
   region     = var.region
   node_count = var.node_count
@@ -26,6 +29,10 @@ resource "digitalocean_database_cluster" "this" {
       day  = maintenance_window.value.day
       hour = maintenance_window.value.hour
     }
+  }
+  lifecycle {
+    # Using a hardcoded value instead of a variable
+  # prevent_destroy = true
   }
 }
 

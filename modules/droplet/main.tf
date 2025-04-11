@@ -1,4 +1,7 @@
 terraform {
+  # Terraform version constraint
+  required_version = ">= 1.0.0"
+
   required_providers {
     digitalocean = {
       source  = "digitalocean/digitalocean"
@@ -17,6 +20,11 @@ resource "digitalocean_droplet" "this" {
   backups            = var.backups
   monitoring         = var.monitoring
   ssh_keys           = var.ssh_keys
+  user_data          = var.user_data != null ? var.user_data : null
 
   tags = var.tags
+  lifecycle {
+    # Using a hardcoded value instead of a variable
+  # prevent_destroy = true
+  }
 }
